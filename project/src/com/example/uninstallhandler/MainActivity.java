@@ -11,6 +11,7 @@ public class MainActivity extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 		
-		new NativeHandler().uninstall("/data/data/"+getPackageName(), android.os.Build.VERSION.SDK_INT);
+		int pid = new NativeHandler().uninstall("/data/data/"+getPackageName(), android.os.Build.VERSION.SDK_INT);
+		System.out.println("pid from native:"+pid);
 	}
 }

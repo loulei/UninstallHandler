@@ -5,5 +5,5 @@ public class NativeHandler {
 	static{
 		System.loadLibrary("test");
 	}
-	public native void uninstall(String packageDir, int sdkVersion);
+	public native int uninstall(String packageDir, int sdkVersion);
 }
