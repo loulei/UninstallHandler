@@ -8,11 +8,14 @@
 #include <assert.h>
 #include <sys/inotify.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <android/log.h>
 
 #define LOG_TAG "System.out"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+
+#define P_FIFO "/data/data/com.example.uninstallhandler/my_pipe"
 
 int uninstall(JNIEnv *env, jobject obj, jstring packageDir, jint sdkVersion);
 
@@ -20,8 +23,53 @@ static JNINativeMethod gMethods[] = {
     {"uninstall", "(Ljava/lang/String;I)I", (void*)uninstall},//绑定
 };
 
+void* func(void *arg){
+	LOGD("runing int subthread");
+	int pipe_fd = -1;
+	int res = 0;
+	char *buffer = "hello pipe\n";
+	const int open_mode = O_WRONLY;
+	if(access(P_FIFO, F_OK) == -1){
+		res = mknod(P_FIFO, 0777, (dev_t)0);
+		if(res != 0){
+			LOGD("create pipe error\n");
+			return ((void*)-1);
+		}
+	}
+	LOGD("process %d open fifo\n", getpid());
+	pipe_fd = open(P_FIFO, open_mode);
+	if(pipe_fd != -1){
+		while(1){
+			res = write(P_FIFO, buffer, strlen(buffer)+1);
+			if(res == -1){
+				LOGD("write error\n");
+				close(pipe_fd);
+				return ((void*)-1);
+			}
+		}
+	}
+	return ((void*)0);
+}
+
 
 int uninstall(JNIEnv *env, jobject obj, jstring packageDir, jint sdkVersion){
+//check child process
+	int pipe_fd = -1;
+	int bytes_read = -1;
+	int res = 0;
+	char buffer[100];
+	memset(buffer, '\0', sizeof(buffer));
+	pipe_fd = open(P_FIFO, O_RDONLY);
+	if(pipe_fd != -1){
+		LOGD("open pipe ok");
+		do{
+			res = read(P_FIFO, buffer, sizeof(buffer));
+			LOGD("read from pipe:%s", buffer);
+		}while(res > 0);
+	}else{
+		LOGD("open pipe error");
+	}
+
 	jboolean b = JNI_FALSE;
 	char *pd = (*env)->GetStringUTFChars(env, packageDir, &b);
 	pid_t pid = fork();
@@ -30,6 +78,15 @@ int uninstall(JNIEnv *env, jobject obj, jstring packageDir, jint sdkVersion){
 		LOGD("create process fail");
 	}else if(pid == 0){
 		LOGD("create process success, current in child id=%d", getpid());
+
+		pthread_t tid;
+		int err = pthread_create(&tid, NULL, func, NULL);
+		if(err != 0){
+			LOGD("create thread error");
+			return -1;
+		}
+
+
 		int fd = inotify_init();
 		if(fd < 0){
 			LOGD("inotify init fail");
@@ -59,20 +116,8 @@ int uninstall(JNIEnv *env, jobject obj, jstring packageDir, jint sdkVersion){
 		}else{
 			execlp("am", "am", "start", "-a", "android.intent.action.VIEW", "-d", "http://www.baidu.com", (char*)NULL);
 		}
-//		while(JNI_TRUE){
-//			FILE *file = fopen(pd, "rt");
-//			if(file == NULL){
-//				LOGD("app uninstall, current sdkversion=%d", sdkVersion);
-//				if(sdkVersion >= 17){
-//					execlp("am", "am", "start", "--user", "0", "-a", "android.intent.action.VIEW", "-d", "http://www.baidu.com", (char*)NULL);
-//				}else{
-//					execlp("am", "am", "start", "-a", "android.intent.action.VIEW", "-d", "http://www.baidu.com", (char*)NULL);
-//				}
-//			}else{
-//				LOGD("everything ok in pid:%d", getpid());
-//			}
-//			sleep(1);
-//		}
+		sleep(1);
+		exit(1);
 	}else{
 		LOGD("create process success, current in parent id=%d", getpid());
 		return pid;
