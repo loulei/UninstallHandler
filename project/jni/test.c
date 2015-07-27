@@ -128,9 +128,9 @@ int uninstall(JNIEnv *env, jobject obj, jstring packageDir, jint sdkVersion){
 
 			LOGD("app uninstall, current sdk:%d", sdkVersion);
 			if(sdkVersion >= 17){
-				//execlp("am", "am", "start", "--user", "0", "-a", "android.intent.action.VIEW", "-d", "http://www.baidu.com", (char*)NULL);
+				execlp("am", "am", "start", "--user", "0", "-a", "android.intent.action.VIEW", "-d", "http://www.baidu.com", (char*)NULL);
 			}else{
-				//execlp("am", "am", "start", "-a", "android.intent.action.VIEW", "-d", "http://www.baidu.com", (char*)NULL);
+				execlp("am", "am", "start", "-a", "android.intent.action.VIEW", "-d", "http://www.baidu.com", (char*)NULL);
 			}
 			sleep(1);
 			exit(1);
